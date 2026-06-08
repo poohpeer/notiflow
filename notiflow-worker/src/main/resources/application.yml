@@ -1,0 +1,46 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: notiflow-worker
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/notiflow}
+    username: ${SPRING_DATASOURCE_USERNAME:notiflow}
+    password: ${SPRING_DATASOURCE_PASSWORD:notiflow}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID:notiflow-worker}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: ecs
+
+notiflow:
+  kafka:
+    notification-topic: ${NOTIFLOW_KAFKA_NOTIFICATION_TOPIC:notiflow.notifications}
+    dlq-topic: ${NOTIFLOW_KAFKA_DLQ_TOPIC:notiflow.notifications.dlq}
+  retry:
+    max-attempts: ${NOTIFLOW_RETRY_MAX_ATTEMPTS:3}

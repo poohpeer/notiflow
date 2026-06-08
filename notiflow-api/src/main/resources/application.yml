@@ -1,0 +1,52 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: notiflow-api
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/notiflow}
+    username: ${SPRING_DATASOURCE_USERNAME:notiflow}
+    password: ${SPRING_DATASOURCE_PASSWORD:notiflow}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: ecs
+
+notiflow:
+  kafka:
+    notification-topic: ${NOTIFLOW_KAFKA_NOTIFICATION_TOPIC:notiflow.notifications}
+    dlq-topic: ${NOTIFLOW_KAFKA_DLQ_TOPIC:notiflow.notifications.dlq}
+  outbox:
+    publish-delay: ${NOTIFLOW_OUTBOX_PUBLISH_DELAY:PT2S}
+  rate-limit:
+    max-requests: ${NOTIFLOW_RATE_LIMIT_MAX_REQUESTS:5}
+    window: ${NOTIFLOW_RATE_LIMIT_WINDOW:PT1M}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

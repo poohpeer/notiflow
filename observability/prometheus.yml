@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: notiflow-api
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["notiflow-api:8080"]
+
+  - job_name: notiflow-worker
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["notiflow-worker:8081"]
