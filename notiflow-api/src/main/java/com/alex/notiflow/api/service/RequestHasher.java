@@ -9,13 +9,12 @@ import java.util.HexFormat;
 import java.util.TreeMap;
 import org.springframework.stereotype.Component;
 
+import lombok.RequiredArgsConstructor;
+
+@RequiredArgsConstructor
 @Component
 public class RequestHasher {
     private final ObjectMapper objectMapper;
-
-    public RequestHasher(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     public String hash(NotificationRequest request) {
         try {

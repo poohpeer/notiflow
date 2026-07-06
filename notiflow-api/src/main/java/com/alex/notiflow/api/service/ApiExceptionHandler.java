@@ -2,12 +2,17 @@ package com.alex.notiflow.api.service;
 
 import java.time.Instant;
 import java.util.Map;
+
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @RestControllerAdvice
 public class ApiExceptionHandler {
     @ExceptionHandler(NotificationNotFoundException.class)
@@ -32,19 +37,25 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<Map<String, Object>> validation(MethodArgumentNotValidException exception) {
-        var message = exception.getBindingResult().getFieldErrors().stream()
+        var message = exception.getBindingResult()
+                .getFieldErrors()
+                .stream()
                 .findFirst()
                 .map(error -> error.getField() + " " + error.getDefaultMessage())
                 .orElse("Request validation failed");
         return error(HttpStatus.BAD_REQUEST, message);
     }
 
+    @ExceptionHandler(InvalidDataAccessApiUsageException.class)
+    ResponseEntity<Map<String, Object>> validation(InvalidDataAccessApiUsageException exception) {
+        var message = "Invalid sort parameter";
+        log.error(exception.getMessage(), exception);
+        return error(HttpStatus.BAD_REQUEST, "Invalid sort parameter");
+    }
+
     private ResponseEntity<Map<String, Object>> error(HttpStatus status, String message) {
-        return ResponseEntity.status(status).body(Map.of(
-                "timestamp", Instant.now().toString(),
-                "status", status.value(),
-                "error", status.getReasonPhrase(),
-                "message", message
-        ));
+        return ResponseEntity.status(status)
+                .body(Map.of("timestamp", Instant.now().toString(), "status", status.value(), "error",
+                        status.getReasonPhrase(), "message", message));
     }
 }

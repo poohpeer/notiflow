@@ -6,6 +6,8 @@ import com.alex.notiflow.api.repository.OutboxEventRepository;
 import com.alex.notiflow.contracts.NotificationStatus;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +16,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+@RequiredArgsConstructor
 @Component
 public class OutboxPublisher {
     private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);
@@ -23,20 +26,6 @@ public class OutboxPublisher {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final KafkaTopicsProperties topics;
     private final MeterRegistry meterRegistry;
-
-    public OutboxPublisher(
-            OutboxEventRepository outboxEventRepository,
-            NotificationRepository notificationRepository,
-            KafkaTemplate<String, String> kafkaTemplate,
-            KafkaTopicsProperties topics,
-            MeterRegistry meterRegistry
-    ) {
-        this.outboxEventRepository = outboxEventRepository;
-        this.notificationRepository = notificationRepository;
-        this.kafkaTemplate = kafkaTemplate;
-        this.topics = topics;
-        this.meterRegistry = meterRegistry;
-    }
 
     @Scheduled(fixedDelayString = "${notiflow.outbox.publish-delay:PT2S}")
     @Transactional

@@ -42,7 +42,7 @@ notiflow:
     notification-topic: ${NOTIFLOW_KAFKA_NOTIFICATION_TOPIC:notiflow.notifications}
     dlq-topic: ${NOTIFLOW_KAFKA_DLQ_TOPIC:notiflow.notifications.dlq}
   outbox:
-    publish-delay: ${NOTIFLOW_OUTBOX_PUBLISH_DELAY:PT2S}
+    publish-delay: ${NOTIFLOW_OUTBOX_PUBLISH_DELAY:PT2M}
   rate-limit:
     max-requests: ${NOTIFLOW_RATE_LIMIT_MAX_REQUESTS:5}
     window: ${NOTIFLOW_RATE_LIMIT_WINDOW:PT1M}
