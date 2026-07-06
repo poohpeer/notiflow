@@ -23,6 +23,7 @@
         <module>notiflow-contracts</module>
         <module>notiflow-api</module>
         <module>notiflow-worker</module>
+        <module>notiflow-relay</module>
     </modules>
 
     <properties>

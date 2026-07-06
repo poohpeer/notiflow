@@ -1,17 +1,15 @@
-package com.alex.notiflow.api.service;
+package com.alex.notiflow.relay.service;
 
-import com.alex.notiflow.api.config.KafkaTopicsProperties;
-import com.alex.notiflow.api.repository.NotificationRepository;
-import com.alex.notiflow.api.repository.OutboxEventRepository;
 import com.alex.notiflow.contracts.NotificationStatus;
+import com.alex.notiflow.relay.config.KafkaTopicsProperties;
+import com.alex.notiflow.relay.repository.NotificationRepository;
+import com.alex.notiflow.relay.repository.OutboxEventRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
-
 import java.time.Instant;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -20,6 +18,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class OutboxPublisher {
     private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);
+    private static final int BATCH_SIZE = 50;
 
     private final OutboxEventRepository outboxEventRepository;
     private final NotificationRepository notificationRepository;
@@ -30,7 +29,7 @@ public class OutboxPublisher {
     @Scheduled(fixedDelayString = "${notiflow.outbox.publish-delay:PT2S}")
     @Transactional
     public void publishPending() {
-        var events = outboxEventRepository.findByPublishedFalseOrderByCreatedAtAsc(PageRequest.of(0, 50));
+        var events = outboxEventRepository.lockPendingBatch(BATCH_SIZE);
         for (var event : events) {
             kafkaTemplate.send(topics.notificationTopic(), event.getAggregateId().toString(), event.getPayload()).join();
             event.setPublished(true);
