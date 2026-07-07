@@ -48,6 +48,7 @@ services:
       retries: 20
 
   notiflow-api:
+    profiles: ["backend"]
     build:
       context: .
       args:
@@ -66,6 +67,7 @@ services:
         condition: service_healthy
 
   notiflow-worker:
+    profiles: ["backend"]
     build:
       context: .
       args:
@@ -85,6 +87,7 @@ services:
         condition: service_healthy
 
   notiflow-relay:
+    profiles: ["backend"]
     build:
       context: .
       args:
@@ -111,12 +114,25 @@ services:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "9090:9090"
+    # Scrapes the apps at host.docker.internal:8080/8081/8082 (see
+    # observability/prometheus.yml), which works whether they run in the IDE or
+    # in Docker. No depends_on the apps: Prometheus starts with the infra and
+    # shows the app targets as DOWN until they come up.
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    depends_on:
-      - notiflow-api
-      - notiflow-worker
-      - notiflow-relay
+
+  # Started separately via its profile, independent of the backend:
+  #   docker compose --profile frontend up -d --build notiflow-frontend
+  # nginx proxies /api and /prom to host.docker.internal (see nginx.conf), so
+  # the backend can be in the IDE or in Docker — the frontend does not care.
+  notiflow-frontend:
+    profiles: ["frontend"]
+    build:
+      context: ./frontend
+    ports:
+      - "5173:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   grafana:
     image: grafana/grafana:11.4.0

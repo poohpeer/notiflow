@@ -7,30 +7,32 @@ Notiflow accepts notification requests over HTTP, stores them durably, publishes
 ## Architecture
 
 ```text
-Client
+Browser (notiflow-frontend, React SPA)
   |
   v
 notiflow-api
   |
-  +--> PostgreSQL notifications + outbox_events
-  +--> Redis rate limit
+  +--> PostgreSQL: notifications + outbox_events
+  +--> Redis: rate limit
   |
-  v
-Kafka topic: notiflow.notifications
-  |
-  v
-notiflow-worker
-  |
-  +--> Mock providers: EMAIL, TELEGRAM, SMS, PUSH
-  |
-  v
-Kafka topic: notiflow.notifications.dlq
+  v  (transactional outbox)
+notiflow-relay  --> Kafka topic: notiflow.notifications
+                          |
+                          v
+                     notiflow-worker
+                          |
+                          +--> Mock providers: EMAIL, TELEGRAM, SMS, PUSH
+                          |
+                          v
+                     Kafka topic: notiflow.notifications.dlq
 ```
 
-The MVP uses two runnable applications, not a full microservice fleet:
+The MVP is a small set of runnable applications, not a full microservice fleet:
 
-- `notiflow-api`: REST API, validation, idempotency, rate limiting and outbox publishing.
+- `notiflow-api`: REST API, validation, idempotency, rate limiting and writing the transactional outbox.
+- `notiflow-relay`: polls the outbox table and publishes events to Kafka.
 - `notiflow-worker`: Kafka consumer, retry policy, mock provider dispatch and DLQ publishing.
+- `notiflow-frontend`: React SPA (dashboard, list/detail, create form) served by nginx.
 - `notiflow-contracts`: shared request/response/event contracts.
 
 ## Technical Highlights
@@ -44,26 +46,66 @@ The MVP uses two runnable applications, not a full microservice fleet:
 - OpenAPI Swagger UI.
 - Spring Actuator health and Prometheus metrics.
 - Grafana dashboard provisioned from repository files.
-- Docker Compose local environment.
+- React dashboard UI (current backlog, delivery-flow throughput, service health) reading the API and the Prometheus HTTP API.
+- Docker Compose local environment with profiles for backend and frontend.
 
 ## Requirements
 
 - Docker and Docker Compose.
-- JDK 25 if running Maven locally.
+- JDK 25 if running the backend from Maven/IDE locally.
+- Node.js 22+ if running the frontend dev server (`npm run dev`); not needed for the Docker image.
 
 The project is intentionally configured for Java 25 because that was selected for the MVP. The current source will not compile on Java 21 without changing `java.version`.
 
 ## Run
 
+The stack is split into Docker Compose profiles so you can run the backend in Docker or in your IDE, and start the frontend on its own. Infrastructure (postgres, redis, kafka, prometheus, grafana) always starts; the backend apps and the UI are behind profiles.
+
+Prometheus scrapes the apps at `host.docker.internal:8080/8081/8082`, and the frontend's nginx proxies `/api` and `/prom` to the host too. Both therefore work whether the backend runs in the IDE (port bound on the host) or in Docker (container port published to the host).
+
+### Backend in the IDE (development)
+
+Start only infrastructure, then run `notiflow-api` / `notiflow-worker` / `notiflow-relay` from IntelliJ:
+
 ```bash
-docker compose up --build
+docker compose up -d
+```
+
+### Backend in Docker
+
+```bash
+docker compose --profile backend up -d --build
+```
+
+### Frontend (independent of the backend)
+
+```bash
+docker compose --profile frontend up -d --build notiflow-frontend
+```
+
+UI at `http://localhost:5173`. The backend it talks to can be running in the IDE or in Docker.
+
+For frontend development with hot reload (Vite proxies to `localhost:8080` / `localhost:9090`):
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Everything in Docker
+
+```bash
+docker compose --profile backend --profile frontend up -d --build
 ```
 
 Services:
 
+- Frontend UI: `http://localhost:5173`
 - API: `http://localhost:8080`
-- Worker actuator: `http://localhost:8081/actuator/health`
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
+- Worker actuator: `http://localhost:8081/actuator/health`
+- Relay actuator: `http://localhost:8082/actuator/health`
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000` (`admin` / `admin`)
 
@@ -165,6 +207,5 @@ curl -i -X POST http://localhost:8080/api/v1/notifications \
 - Real email provider through SMTP or MailHog.
 - Telegram provider with bot token.
 - Auth/JWT.
-- Dashboard UI with realtime status updates.
 - Kubernetes manifests.
 - CI pipeline.
