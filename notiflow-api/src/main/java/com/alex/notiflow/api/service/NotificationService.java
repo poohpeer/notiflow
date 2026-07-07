@@ -1,27 +1,27 @@
 package com.alex.notiflow.api.service;
 
-import com.alex.notiflow.api.domain.NotificationEntity;
-import com.alex.notiflow.api.domain.OutboxEventEntity;
-import com.alex.notiflow.api.repository.NotificationRepository;
-import com.alex.notiflow.api.repository.OutboxEventRepository;
-import com.alex.notiflow.contracts.NotificationAcceptedResponse;
-import com.alex.notiflow.contracts.NotificationChannel;
-import com.alex.notiflow.contracts.NotificationCreatedEvent;
-import com.alex.notiflow.contracts.NotificationRequest;
-import com.alex.notiflow.contracts.NotificationStatus;
-import com.alex.notiflow.contracts.NotificationStatusResponse;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.micrometer.core.instrument.MeterRegistry;
-import jakarta.transaction.Transactional;
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import com.alex.notiflow.api.domain.NotificationEntity;
+import com.alex.notiflow.api.repository.NotificationRepository;
+import com.alex.notiflow.api.repository.OutboxEventRepository;
+import com.alex.notiflow.contracts.NotificationAcceptedResponse;
+import com.alex.notiflow.contracts.NotificationChannel;
+import com.alex.notiflow.contracts.NotificationRequest;
+import com.alex.notiflow.contracts.NotificationStatus;
+import com.alex.notiflow.contracts.NotificationStatusResponse;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+
+@RequiredArgsConstructor
 @Service
 public class NotificationService {
     private final NotificationRepository notificationRepository;
@@ -29,26 +29,7 @@ public class NotificationService {
     private final RateLimiter rateLimiter;
     private final RequestHasher requestHasher;
     private final NotificationMapper mapper;
-    private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
-
-    public NotificationService(
-            NotificationRepository notificationRepository,
-            OutboxEventRepository outboxEventRepository,
-            RateLimiter rateLimiter,
-            RequestHasher requestHasher,
-            NotificationMapper mapper,
-            ObjectMapper objectMapper,
-            MeterRegistry meterRegistry
-    ) {
-        this.notificationRepository = notificationRepository;
-        this.outboxEventRepository = outboxEventRepository;
-        this.rateLimiter = rateLimiter;
-        this.requestHasher = requestHasher;
-        this.mapper = mapper;
-        this.objectMapper = objectMapper;
-        this.meterRegistry = meterRegistry;
-    }
 
     @Transactional
     public NotificationAcceptedResponse create(String idempotencyKey, NotificationRequest request) {
@@ -84,7 +65,7 @@ public class NotificationService {
         notification.setUpdatedAt(now);
 
         notificationRepository.save(notification);
-        outboxEventRepository.save(toOutboxEvent(notification, request.metadata(), now));
+        outboxEventRepository.save(mapper.toOutboxEvent(notification, request.metadata(), now));
         meterRegistry.counter("notiflow.notifications.accepted", "channel", request.channel().name()).increment();
         return acceptedResponse(notification);
     }
@@ -95,11 +76,8 @@ public class NotificationService {
                 .orElseThrow(() -> new NotificationNotFoundException(id));
     }
 
-    public Page<NotificationStatusResponse> list(
-            NotificationChannel channel,
-            NotificationStatus status,
-            Pageable pageable
-    ) {
+    public Page<NotificationStatusResponse> list(NotificationChannel channel, NotificationStatus status,
+            Pageable pageable) {
         Page<NotificationEntity> page;
         if (channel != null && status != null) {
             page = notificationRepository.findByChannelAndStatus(channel, status, pageable);
@@ -113,35 +91,8 @@ public class NotificationService {
         return page.map(mapper::toStatusResponse);
     }
 
-    private OutboxEventEntity toOutboxEvent(NotificationEntity notification, Map<String, String> metadata, Instant now) {
-        try {
-            var event = new NotificationCreatedEvent(
-                    notification.getId(),
-                    notification.getChannel(),
-                    notification.getRecipient(),
-                    notification.getSubject(),
-                    notification.getMessage(),
-                    metadata,
-                    now
-            );
-            var outboxEvent = new OutboxEventEntity();
-            outboxEvent.setAggregateType("notification");
-            outboxEvent.setAggregateId(notification.getId());
-            outboxEvent.setEventType("notification.created");
-            outboxEvent.setPayload(objectMapper.writeValueAsString(event));
-            outboxEvent.setPublished(false);
-            outboxEvent.setCreatedAt(now);
-            return outboxEvent;
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("Unable to serialize notification event", exception);
-        }
-    }
-
     private NotificationAcceptedResponse acceptedResponse(NotificationEntity notification) {
-        return new NotificationAcceptedResponse(
-                notification.getId(),
-                notification.getStatus(),
-                "/api/v1/notifications/" + notification.getId()
-        );
+        return new NotificationAcceptedResponse(notification.getId(), notification.getStatus(),
+                "/api/v1/notifications/" + notification.getId());
     }
 }

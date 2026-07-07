@@ -1,4 +1,4 @@
-package com.alex.notiflow.api.config;
+package com.alex.notiflow.relay.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

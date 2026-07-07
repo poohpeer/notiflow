@@ -7,6 +7,7 @@ COPY .mvn .mvn
 COPY notiflow-contracts notiflow-contracts
 COPY notiflow-api notiflow-api
 COPY notiflow-worker notiflow-worker
+COPY notiflow-relay notiflow-relay
 ARG MODULE
 RUN mvn --batch-mode -pl ${MODULE} -am package -DskipTests
 

@@ -8,17 +8,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@RequiredArgsConstructor
 @Component
 public class NotificationConsumer {
-    private static final Logger log = LoggerFactory.getLogger(NotificationConsumer.class);
 
     private final ObjectMapper objectMapper;
     private final NotificationProcessor processor;
-
-    public NotificationConsumer(ObjectMapper objectMapper, NotificationProcessor processor) {
-        this.objectMapper = objectMapper;
-        this.processor = processor;
-    }
 
     @KafkaListener(
             topics = "${notiflow.kafka.notification-topic}",

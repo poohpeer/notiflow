@@ -56,7 +56,6 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notiflow
       SPRING_DATASOURCE_USERNAME: notiflow
       SPRING_DATASOURCE_PASSWORD: notiflow
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING_DATA_REDIS_HOST: redis
     ports:
       - "8080:8080"
@@ -64,8 +63,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      kafka:
         condition: service_healthy
 
   notiflow-worker:
@@ -87,6 +84,25 @@ services:
       kafka:
         condition: service_healthy
 
+  notiflow-relay:
+    build:
+      context: .
+      args:
+        MODULE: notiflow-relay
+    environment:
+      SERVER_PORT: 8082
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notiflow
+      SPRING_DATASOURCE_USERNAME: notiflow
+      SPRING_DATASOURCE_PASSWORD: notiflow
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
   prometheus:
     image: prom/prometheus:v3.0.1
     command:
@@ -95,9 +111,12 @@ services:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - notiflow-api
       - notiflow-worker
+      - notiflow-relay
 
   grafana:
     image: grafana/grafana:11.4.0

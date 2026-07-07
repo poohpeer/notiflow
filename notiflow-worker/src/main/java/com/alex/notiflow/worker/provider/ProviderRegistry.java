@@ -4,13 +4,12 @@ import com.alex.notiflow.contracts.NotificationChannel;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
+import lombok.RequiredArgsConstructor;
+
+@RequiredArgsConstructor
 @Component
 public class ProviderRegistry {
     private final List<NotificationProvider> providers;
-
-    public ProviderRegistry(List<NotificationProvider> providers) {
-        this.providers = providers;
-    }
 
     public NotificationProvider get(NotificationChannel channel) {
         return providers.stream()
