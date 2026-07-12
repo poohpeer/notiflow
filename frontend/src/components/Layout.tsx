@@ -18,9 +18,8 @@ export function Layout() {
     <div className="min-h-screen">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <NavLink to="/" className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-            <Logo className="h-8 w-8" />
-            Notiflow
+          <NavLink to="/" className="flex items-center" aria-label="Notiflow">
+            <Logo className="h-9 w-auto" />
           </NavLink>
           <nav className="flex items-center gap-1">
             {navItems.map((item) => (
