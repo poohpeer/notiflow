@@ -58,6 +58,11 @@ services:
       SPRING_DATASOURCE_USERNAME: notiflow
       SPRING_DATASOURCE_PASSWORD: notiflow
       SPRING_DATA_REDIS_HOST: redis
+      # Dashboard login. The default hash below is bcrypt("admin") — fine for a
+      # local demo, must be overridden anywhere reachable from the internet:
+      #   htpasswd -bnBC 12 "" 'your-password' | tr -d ':\n'
+      NOTIFLOW_SECURITY_USERNAME: ${NOTIFLOW_SECURITY_USERNAME:-admin}
+      NOTIFLOW_SECURITY_PASSWORD_HASH: ${NOTIFLOW_SECURITY_PASSWORD_HASH:-$$2y$$12$$oql/jYpz7TXOSmiYOU.LgOqgELWxeB2uZEXKctsYoo0SqKsIOoWDq}
     ports:
       - "8080:8080"
     depends_on:
@@ -137,9 +142,11 @@ services:
   grafana:
     image: grafana/grafana:11.4.0
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Anonymous viewers are convenient locally and a data leak in public — the
+      # dashboards expose recipients and volumes. Keep this false anywhere but dev.
+      GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-true}
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_USERS_DEFAULT_THEME: light
     volumes:

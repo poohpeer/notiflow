@@ -33,6 +33,12 @@ logging:
       console: ecs
 
 notiflow:
+  security:
+    username: ${NOTIFLOW_SECURITY_USERNAME:admin}
+    # bcrypt hash of "admin" — dev default only. Override in any deployment:
+    #   htpasswd -bnBC 12 "" 'your-password' | tr -d ':\n'
+    password-hash: ${NOTIFLOW_SECURITY_PASSWORD_HASH:$2y$12$oql/jYpz7TXOSmiYOU.LgOqgELWxeB2uZEXKctsYoo0SqKsIOoWDq}
+    session-timeout: ${NOTIFLOW_SECURITY_SESSION_TIMEOUT:PT8H}
   rate-limit:
     max-requests: ${NOTIFLOW_RATE_LIMIT_MAX_REQUESTS:5}
     window: ${NOTIFLOW_RATE_LIMIT_WINDOW:PT1M}

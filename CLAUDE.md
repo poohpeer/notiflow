@@ -16,10 +16,10 @@ Delivery is intentionally split so each stage scales independently. The api neve
 ## Modules (Maven multi-module, parent `pom.xml`)
 
 - `notiflow-contracts` — shared records/enums (`NotificationRequest`, `NotificationCreatedEvent`, `ProviderResult`, `NotificationStatus`, `NotificationChannel`, `FailureType`). No Spring. Depended on by all services.
-- `notiflow-api` — REST API (`POST/GET /api/v1/notifications`), validation, idempotency, Redis rate limiting, writes the outbox. Port 8080.
+- `notiflow-api` — REST API (`POST/GET /api/v1/notifications`), session auth (`/api/v1/auth/*`), validation, idempotency, Redis rate limiting, writes the outbox. Port 8080.
 - `notiflow-relay` — scheduled outbox publisher, `SKIP LOCKED` batch, N-replica safe, transitions `ACCEPTED → QUEUED`. Port 8082.
 - `notiflow-worker` — Kafka consumer, retry policy, mock providers, DLQ publishing. Port 8081.
-- `frontend` — Vite + React + TypeScript + Tailwind + React Query SPA. Dashboard, notifications list/detail, create form. Dev port 5173.
+- `frontend` — Vite + React + TypeScript + Tailwind + React Query SPA. Login, dashboard, notifications list/detail, create form. Dev port 5173.
 
 Java package root: `com.alex.notiflow.<module>`.
 
@@ -27,7 +27,9 @@ Java package root: `com.alex.notiflow.<module>`.
 
 - **Transactional outbox** — `NotificationService.create` saves `NotificationEntity` + `OutboxEventEntity` in one `@Transactional`. Do not publish to Kafka from the api.
 - **Idempotency** — `Idempotency-Key` header required on create. Same key + same payload hash (`RequestHasher`, order-independent metadata) → returns the existing notification; same key + different hash → 409 `IdempotencyConflictException`; missing → `MissingIdempotencyKeyException` (400).
-- **Rate limiting** — `RateLimiter` uses Redis `setIfAbsent` + `increment` per `channel:recipient` window. (A prior race condition was fixed here — keep it atomic.)
+- **Rate limiting** — `RateLimiter` uses Redis `setIfAbsent` + `increment` per `channel:recipient` window. (A prior race condition was fixed here — keep it atomic.) It says nothing about the *caller*; the per-IP bound lives in `frontend/nginx.conf` (`limit_req_zone`, a strict zone on the login).
+- **Auth** — `SecurityConfig`: everything under `/api/**` needs a session, except `/api/v1/auth/login`; `/actuator/**` is open so Prometheus can scrape it. Anonymous → 401 JSON (never a redirect — the SPA depends on this). One user, from `notiflow.security.{username,password-hash}` (bcrypt) via ENV. CSRF is on: cookie `XSRF-TOKEN` → header `X-XSRF-TOKEN`; `CsrfCookieFilter` exists to force the cookie to be written.
+- **Sessions** — `SessionConfig` enables `@EnableRedisHttpSession` **explicitly**. `spring.session.store-type: redis` is not honoured by the Boot 4 autoconfiguration here and silently degrades to an in-memory session — do not "simplify" it back to the property.
 - **Retry / DLQ** — `NotificationProcessor` loops up to `notiflow.retry.max-attempts`. `PERMANENT` → `FAILED_PERMANENT` immediately; `RETRYABLE` → retries; exhausted → `DEAD_LETTERED` + publish to `notiflow.notifications.dlq`. Terminal statuses (`SENT`, `FAILED_PERMANENT`, `DEAD_LETTERED`) are skipped (idempotent consumption).
 - **Mock delivery** — `MockNotificationProvider` reads `metadata.mockFailure` (`permanent`, `retryable`, `retryable-once`) to drive demo failures.
 
@@ -35,6 +37,7 @@ Java package root: `com.alex.notiflow.<module>`.
 
 - JDK 25 (`java.version=25`), Spring Boot 4.0.6. Won't compile on 21.
 - Build: `./mvnw -q verify` (or `mvn`). Tests: JUnit 5 + AssertJ + Mockito, plain unit tests (no Spring context) — mock collaborators, use `SimpleMeterRegistry` for `MeterRegistry`. Testcontainers BOM is available for integration tests if needed.
+- `@WebMvcTest` does **not** load `SecurityConfig`, so controller tests run unauthenticated and would still pass if the api went wide open. `SecurityConfigTest` imports the chain explicitly and is the only thing asserting the endpoints are protected — keep it that way.
 - Frontend: `cd frontend && npm install && npm run dev` (or `npm run build`).
 
 ## Run (Docker Compose profiles)
