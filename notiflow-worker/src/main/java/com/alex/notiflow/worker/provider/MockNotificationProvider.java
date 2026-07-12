@@ -19,8 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class MockNotificationProvider implements NotificationProvider {
 
-
-
     @Override
     public boolean supports(NotificationChannel channel) {
         return EnumSet.allOf(NotificationChannel.class).contains(channel);
