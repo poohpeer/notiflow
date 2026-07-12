@@ -26,7 +26,7 @@ public class MockNotificationProvider implements NotificationProvider {
 
     @Override
     public ProviderResult send(NotificationCreatedEvent event, int attempt) {
-        var mode = MockFailureType.getRandomFailure();
+        var mode = resolveFailureMode(event);
         log.info("Mock send notificationId={} channel={} recipient={} attempt={}", event.notificationId(),
                 event.channel(), event.recipient(), attempt);
 
@@ -40,6 +40,23 @@ public class MockNotificationProvider implements NotificationProvider {
             return ProviderResult.retryable("Mock retryable provider failure on first attempt");
         }
         return ProviderResult.success();
+    }
+
+    private MockFailureType resolveFailureMode(NotificationCreatedEvent event) {
+        if (event.metadata() == null) {
+            return null;
+        }
+        var mockFailure = event.metadata().get("mockFailure");
+        if (mockFailure == null || mockFailure.isBlank()) {
+            return null;
+        }
+        try {
+            return MockFailureType.valueOf(mockFailure.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("Unknown mockFailure value '{}' for notificationId={}, treating as success",
+                    mockFailure, event.notificationId());
+            return null;
+        }
     }
 
 }

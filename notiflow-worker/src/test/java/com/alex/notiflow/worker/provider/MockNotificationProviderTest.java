@@ -31,7 +31,7 @@ class MockNotificationProviderTest {
 
     @Test
     void retryableOnceSucceedsAfterFirstAttempt() {
-        var event = event(Map.of("mockFailure", "retryable-once"));
+        var event = event(Map.of("mockFailure", "retryable_once"));
 
         assertThat(provider.send(event, 1).failureType()).isEqualTo(FailureType.RETRYABLE);
         assertThat(provider.send(event, 2).sent()).isTrue();
