@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { useCurrentUser, useLogout } from '../hooks/useAuth';
 import { Logo } from './Logo';
 
 const navItems = [
@@ -14,6 +15,9 @@ function navClass({ isActive }: { isActive: boolean }): string {
 }
 
 export function Layout() {
+  const { data: currentUser } = useCurrentUser();
+  const logoutMutation = useLogout();
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-slate-200 bg-white">
@@ -27,6 +31,19 @@ export function Layout() {
                 {item.label}
               </NavLink>
             ))}
+            {currentUser && (
+              <div className="ml-3 flex items-center gap-2 border-l border-slate-200 pl-3">
+                <span className="text-sm text-slate-500">{currentUser.username}</span>
+                <button
+                  type="button"
+                  onClick={() => logoutMutation.mutate()}
+                  disabled={logoutMutation.isPending}
+                  className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60"
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
           </nav>
         </div>
       </header>

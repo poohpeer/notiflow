@@ -39,11 +39,23 @@ async function parseBody(res: Response): Promise<unknown> {
   }
 }
 
+function readCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // Spring Security hands out the CSRF token in a readable XSRF-TOKEN cookie and
+  // expects it back in this header on every mutating request.
+  const csrfToken = readCookie('XSRF-TOKEN');
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
+    // The session id lives in an HttpOnly cookie; without this it is not sent.
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-XSRF-TOKEN': csrfToken } : {}),
       ...(init?.headers ?? {}),
     },
   });

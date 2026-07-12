@@ -40,7 +40,8 @@ The MVP is a small set of runnable applications, not a full microservice fleet:
 - Async processing with Kafka.
 - Transactional outbox table between PostgreSQL and Kafka.
 - Required `Idempotency-Key` header for safe client retries.
-- Redis-backed per-channel/per-recipient rate limiting.
+- Redis-backed per-channel/per-recipient rate limiting, plus per-IP limits in the frontend's nginx.
+- Session auth (Spring Security) with the session stored in Redis and CSRF tokens for the SPA.
 - Retry policy with `FAILED_RETRYABLE` and `DEAD_LETTERED` states.
 - Mock providers for email, telegram, sms and push.
 - OpenAPI Swagger UI.
@@ -83,7 +84,7 @@ docker compose --profile backend up -d --build
 docker compose --profile frontend up -d --build notiflow-frontend
 ```
 
-UI at `http://localhost:5173`. The backend it talks to can be running in the IDE or in Docker.
+UI at `http://localhost:5173`, which asks for a login (`admin` / `admin` by default — see [Authentication](#authentication)). The backend it talks to can be running in the IDE or in Docker.
 
 For frontend development with hot reload (Vite proxies to `localhost:8080` / `localhost:9090`):
 
@@ -111,10 +112,44 @@ Services:
 
 Grafana is preconfigured with Prometheus as the default datasource. Open Dashboards -> Notiflow -> Notiflow Overview.
 
+## Authentication
+
+Every `/api/**` endpoint except the login requires a session; `/actuator/**` stays open so Prometheus can scrape it. Anonymous calls get `401` (a JSON body, not a redirect — the SPA needs to act on it).
+
+The user is a single account read from the environment, with a bcrypt hash rather than a plaintext password. Defaults are `admin` / `admin` — fine locally, **change them anywhere reachable from the internet**:
+
+```bash
+htpasswd -bnBC 12 "" 'your-password' | tr -d ':\n'   # -> NOTIFLOW_SECURITY_PASSWORD_HASH
+```
+
+| Variable | Default |
+| --- | --- |
+| `NOTIFLOW_SECURITY_USERNAME` | `admin` |
+| `NOTIFLOW_SECURITY_PASSWORD_HASH` | bcrypt of `admin` |
+| `NOTIFLOW_SECURITY_SESSION_TIMEOUT` | `PT8H` |
+
+The session id is an HttpOnly cookie and the session itself lives in Redis, so a login survives an api restart and works across replicas. Mutating requests also carry a CSRF token: the api sets a readable `XSRF-TOKEN` cookie, the caller echoes it in the `X-XSRF-TOKEN` header.
+
+For curl that means logging in first and keeping a cookie jar. The initial GET is what seeds the CSRF cookie:
+
+```bash
+curl -s -c cookies.txt http://localhost:8080/api/v1/auth/me            # seeds XSRF-TOKEN (401, expected)
+XSRF=$(grep XSRF-TOKEN cookies.txt | awk '{print $7}')
+
+curl -s -b cookies.txt -c cookies.txt -X POST http://localhost:8080/api/v1/auth/login \
+  -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $XSRF" \
+  -d '{"username":"admin","password":"admin"}'
+```
+
+Other endpoints: `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`.
+
 ## Create A Notification
+
+Uses the `cookies.txt` and `$XSRF` from the login above.
 
 ```bash
 curl -i -X POST http://localhost:8080/api/v1/notifications \
+  -b cookies.txt -H "X-XSRF-TOKEN: $XSRF" \
   -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: demo-001' \
   -d '{
@@ -139,7 +174,7 @@ Response:
 Check status:
 
 ```bash
-curl http://localhost:8080/api/v1/notifications/{notificationId}
+curl -b cookies.txt http://localhost:8080/api/v1/notifications/{notificationId}
 ```
 
 ## Idempotency
@@ -158,6 +193,7 @@ Trigger one retry, then success:
 
 ```bash
 curl -i -X POST http://localhost:8080/api/v1/notifications \
+  -b cookies.txt -H "X-XSRF-TOKEN: $XSRF" \
   -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: retry-once-001' \
   -d '{
@@ -174,6 +210,7 @@ Trigger DLQ after configured max attempts:
 
 ```bash
 curl -i -X POST http://localhost:8080/api/v1/notifications \
+  -b cookies.txt -H "X-XSRF-TOKEN: $XSRF" \
   -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: dlq-001' \
   -d '{
@@ -190,6 +227,7 @@ Trigger permanent failure without retry:
 
 ```bash
 curl -i -X POST http://localhost:8080/api/v1/notifications \
+  -b cookies.txt -H "X-XSRF-TOKEN: $XSRF" \
   -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: permanent-001' \
   -d '{
@@ -206,6 +244,7 @@ curl -i -X POST http://localhost:8080/api/v1/notifications \
 
 - Real email provider through SMTP or MailHog.
 - Telegram provider with bot token.
-- Auth/JWT.
+- Multiple users and roles (today it is one account from the environment).
+- Auth for the Prometheus HTTP API — `/prom` is currently rate-limited but not authenticated.
 - Kubernetes manifests.
 - CI pipeline.

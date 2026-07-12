@@ -20,6 +20,14 @@ The dev server proxies requests so the SPA stays same-origin (no CORS config on 
 
 So the backend infra must be running — from the repo root: `docker compose up -d` (infra) plus the api/worker/relay, or `docker compose --profile backend up -d --build`.
 
+## Auth
+
+Everything except `/login` sits behind `ProtectedRoute`, which checks the session via `GET /api/v1/auth/me`. That is a convenience only — `notiflow-api` enforces auth itself, so a hidden route is not a protected one.
+
+The session id is an HttpOnly cookie (the session lives in Redis), so `client.ts` sends `credentials: 'include'` on every call. Mutating requests also need the CSRF token: Spring Security sets a readable `XSRF-TOKEN` cookie and `client.ts` echoes it back in `X-XSRF-TOKEN`. The cookie is seeded by the first GET the app makes, which is why a login POST must be preceded by the `/auth/me` check the SPA already does.
+
+Dev credentials: `admin` / `admin` (see `notiflow.security.*` in `notiflow-api/src/main/resources/application.yml`).
+
 ## Scripts
 
 | Command             | What it does                          |
@@ -36,12 +44,12 @@ So the backend infra must be running — from the repo root: `docker compose up 
 
 ```
 src/
-  api/         REST client, notification + Prometheus metric queries, shared types
-  components/  Layout, Logo, badges, KPI cards, chart, toast, pagination
-  hooks/       useNotifications, useMetrics (React Query wrappers)
+  api/         REST client (session + CSRF), auth, notification + Prometheus queries, types
+  components/  Layout, Logo, ProtectedRoute, badges, KPI cards, chart, toast, pagination
+  hooks/       useNotifications, useMetrics, useAuth (React Query wrappers)
   lib/         formatting helpers
-  pages/       Dashboard, Notifications, NotificationDetail, CreateNotification
-  router.tsx   routes
+  pages/       Login, Dashboard, Notifications, NotificationDetail, CreateNotification
+  router.tsx   routes (everything but /login wrapped in ProtectedRoute)
 public/        brand assets — notiflow-logo.svg, favicon.ico + PNG sizes
 ```
 
