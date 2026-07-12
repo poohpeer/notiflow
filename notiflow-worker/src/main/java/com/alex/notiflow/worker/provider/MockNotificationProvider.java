@@ -1,16 +1,17 @@
 package com.alex.notiflow.worker.provider;
 
-import static com.alex.notiflow.worker.provider.MockFailureType.PERMANENT;
-import static com.alex.notiflow.worker.provider.MockFailureType.RETRYABLE;
-import static com.alex.notiflow.worker.provider.MockFailureType.RETRYABLE_ONCE;
+import static com.alex.notiflow.contracts.MockFailureType.PERMANENT;
+import static com.alex.notiflow.contracts.MockFailureType.RETRYABLE;
+import static com.alex.notiflow.contracts.MockFailureType.RETRYABLE_ONCE;
 
+import java.util.EnumSet;
+
+import org.springframework.stereotype.Component;
+
+import com.alex.notiflow.contracts.MockFailureType;
 import com.alex.notiflow.contracts.NotificationChannel;
 import com.alex.notiflow.contracts.NotificationCreatedEvent;
 import com.alex.notiflow.contracts.ProviderResult;
-import java.util.EnumSet;
-import java.util.Map;
-
-import org.springframework.stereotype.Component;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -28,13 +29,8 @@ public class MockNotificationProvider implements NotificationProvider {
     @Override
     public ProviderResult send(NotificationCreatedEvent event, int attempt) {
         var mode = MockFailureType.getRandomFailure();
-        log.info(
-                "Mock send notificationId={} channel={} recipient={} attempt={}",
-                event.notificationId(),
-                event.channel(),
-                event.recipient(),
-                attempt
-        );
+        log.info("Mock send notificationId={} channel={} recipient={} attempt={}", event.notificationId(),
+                event.channel(), event.recipient(), attempt);
 
         if (PERMANENT.equals(mode)) {
             return ProviderResult.permanent("Mock permanent provider failure");
